@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mojocn/base64Captcha/store"
+	"github.com/louismax/base64Captcha/store"
 )
 
 var configD = ConfigDigit{
