@@ -165,7 +165,7 @@ func VerifyCaptchaAndIsClear(identifier, verifyValue string, isClear bool) bool 
 // 	idKeyD,capD := base64Captcha.GenerateCaptcha("",configD)
 // 	//write to base64 string.
 // 	base64stringD := base64Captcha.CaptchaWriteToBase64Encoding(capD)
-func GenerateCaptcha(idKey string, configuration interface{}) (id string, captchaInstance CaptchaInterface) {
+func GenerateCaptcha(idKey string, configuration interface{}) (id,val string, captchaInstance CaptchaInterface) {
 	if idKey == "" {
 		idKey = randomId()
 	}
@@ -193,7 +193,7 @@ func GenerateCaptcha(idKey string, configuration interface{}) (id string, captch
 
 	globalStore.Set(idKey, verifyValue)
 
-	return idKey, captchaInstance
+	return idKey,verifyValue, captchaInstance
 }
 
 func pathExists(path string) bool {
