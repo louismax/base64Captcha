@@ -1,137 +1,218 @@
-// Copyright 2017 Eric Zhou. All Rights Reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-// Package base64Captcha supports digits, numbers,alphabet, arithmetic, audio and digit-alphabet captcha.
-// base64Captcha is used for fast development of RESTful APIs, web apps and backend services in Go. give a string identifier to the package and it returns with a base64-encoding-png-string
 package base64Captcha
 
 import (
-	"math/rand"
-	"reflect"
+	"io/ioutil"
+	"os"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/mojocn/base64Captcha/store"
 )
 
-func TestCaptcha_GenerateB64s(t *testing.T) {
-	type fields struct {
-		Driver Driver
-		Store  Store
-	}
+var configD = ConfigDigit{
+	Height:     80,
+	Width:      240,
+	MaxSkew:    0.7,
+	DotCount:   80,
+	CaptchaLen: 5,
+}
 
-	dDigit := DriverDigit{80, 240, 5, 0.7, 5}
-	audioDriver := NewDriverAudio(rand.Intn(5), "en")
-	tests := []struct {
-		name     string
-		fields   fields
-		wantId   string
-		wantB64s string
-		wantErr  bool
-	}{
-		{"mem-digit", fields{&dDigit, DefaultMemStore}, "xxxx", "", false},
-		{"mem-audio", fields{audioDriver, DefaultMemStore}, "xxxx", "", false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			c := NewCaptcha(tt.fields.Driver, tt.fields.Store)
-			gotId, b64s, err := c.Generate()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Captcha.Generate() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			t.Log(b64s)
+var configA = ConfigAudio{
+	CaptchaLen: 6,
+	Language:   "zh",
+}
 
-			a := c.Store.Get(gotId, false)
-			if !c.Verify(gotId, a, true) {
-				t.Error("false")
-			}
-		})
+var configC = ConfigCharacter{
+	Height:             60,
+	Width:              240,
+	Mode:               0,
+	ComplexOfNoiseText: 0,
+	ComplexOfNoiseDot:  0,
+	IsUseSimpleFont:    false,
+	IsShowHollowLine:   false,
+	IsShowNoiseDot:     false,
+	IsShowNoiseText:    false,
+	IsShowSlimeLine:    false,
+	IsShowSineLine:     false,
+	CaptchaLen:         6,
+}
+
+func TestGenerateCaptcha(t *testing.T) {
+	testDir, _ := ioutil.TempDir("", "")
+	defer os.Remove(testDir)
+
+	for idx, vv := range []interface{}{configA, configD} {
+
+		idkey, cap := GenerateCaptcha("", vv)
+		ext := "png"
+		if idx == 0 {
+			ext = "wav"
+		}
+
+		CaptchaWriteToFile(cap, testDir, idkey, ext)
+		CaptchaWriteToFile(cap, testDir, idkey, ext)
+
+		CaptchaWriteToFile(cap, testDir, idkey, ext)
+
+		// t.Log(idkey, globalStore.Get(idkey, false))
+
+	}
+	testDirAll, _ := ioutil.TempDir("", "all")
+	defer os.RemoveAll(testDirAll)
+	for i := 0; i < 16; i++ {
+		configC.Mode = i % 4
+		idkey, cap := GenerateCaptcha("", configC)
+		ext := "png"
+		err := CaptchaWriteToFile(cap, testDirAll, "char_"+idkey, ext)
+		if err != nil {
+			t.Error(err)
+		}
 	}
 }
 
-func TestCaptcha_Verify(t *testing.T) {
-	type fields struct {
-		Driver Driver
-		Store  Store
+func TestCaptchaWriteToBase64Encoding(t *testing.T) {
+	_, cap := GenerateCaptcha("", configD)
+	base64string := CaptchaWriteToBase64Encoding(cap)
+	if !strings.Contains(base64string, MimeTypeCaptchaImage) {
+
+		t.Error("encodeing base64 string failed.")
 	}
+	_, capA := GenerateCaptcha("", configA)
+	base64stringA := CaptchaWriteToBase64Encoding(capA)
+	if !strings.Contains(base64stringA, MimeTypeCaptchaAudio) {
+
+		t.Error("encodeing base64 string failed.")
+	}
+
+}
+
+func TestVerifyCaptcha(t *testing.T) {
+	idkey, _ := GenerateCaptcha("", configD)
+	verifyValue := globalStore.Get(idkey, false)
+	if VerifyCaptcha(idkey, verifyValue) {
+		t.Log(idkey, verifyValue)
+	} else {
+		t.Error("verify captcha content is failed.")
+	}
+
+	VerifyCaptcha("", "")
+	VerifyCaptcha("dsafasf", "ddd")
+
+}
+
+func TestPathExists(t *testing.T) {
+
+	testDir, _ := ioutil.TempDir("", "")
+	defer os.RemoveAll(testDir)
+	if pathExists(testDir) == false {
+		t.Error(testDir, "mkdir failed")
+	}
+
+	if pathExists(testDir+"/NotExistFolder") == true {
+		t.Error(testDir+"/NotExistFolder", "failed")
+
+	}
+}
+
+func TestCaptchaWriteToFileCreateDirectory(t *testing.T) {
+	idKey, captcha := GenerateCaptcha("", configD)
+	testDir, _ := ioutil.TempDir("", "")
+	defer os.Remove(testDir)
+	err := CaptchaWriteToFile(captcha, testDir+"/NotExistFolder", idKey, "png")
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestCaptchaWriteToFileCreateFileFailed(t *testing.T) {
+
+	var err error
+	idKey, captcha := GenerateCaptcha("", configD)
+	testDir, _ := ioutil.TempDir("", "")
+	defer os.Remove(testDir)
+	noPermissionDirPath := testDir + "/NoPermission"
+
+	err = os.Mkdir(noPermissionDirPath, os.ModeDir)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = CaptchaWriteToFile(captcha, noPermissionDirPath, idKey, "png")
+	//has no permission must failed
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestSetCustomStore(t *testing.T) {
+	s := store.NewMemoryStore(1000, 10*time.Minute)
+	SetCustomStore(s)
+	if s != globalStore {
+		t.Error("SetCustomStore failed")
+	}
+}
+
+func TestCaptchaWriteToFile(t *testing.T) {
 	type args struct {
-		id     string
-		answer string
-		clear  bool
+		cap       CaptchaInterface
+		outputDir string
+		fileName  string
+		fileExt   string
 	}
 	tests := []struct {
-		name      string
-		fields    fields
-		args      args
-		wantMatch bool
+		name    string
+		args    args
+		wantErr bool
 	}{
 		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &Captcha{
-				Driver: tt.fields.Driver,
-				Store:  tt.fields.Store,
-			}
-			if gotMatch := c.Verify(tt.args.id, tt.args.answer, tt.args.clear); gotMatch != tt.wantMatch {
-				t.Errorf("Captcha.Verify() = %v, want %v", gotMatch, tt.wantMatch)
+			if err := CaptchaWriteToFile(tt.args.cap, tt.args.outputDir, tt.args.fileName, tt.args.fileExt); (err != nil) != tt.wantErr {
+				t.Errorf("CaptchaWriteToFile() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
-func TestNewCaptcha(t *testing.T) {
+func TestVerifyCaptchaAndIsClear(t *testing.T) {
 	type args struct {
-		driver Driver
-		store  Store
+		identifier  string
+		verifyValue string
+		isClear     bool
 	}
 	tests := []struct {
 		name string
 		args args
-		want *Captcha
+		want bool
 	}{
 		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewCaptcha(tt.args.driver, tt.args.store); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewCaptcha() = %v, want %v", got, tt.want)
+			if got := VerifyCaptchaAndIsClear(tt.args.identifier, tt.args.verifyValue, tt.args.isClear); got != tt.want {
+				t.Errorf("VerifyCaptchaAndIsClear() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestCaptcha_Generate(t *testing.T) {
+func Test_pathExists(t *testing.T) {
+	type args struct {
+		path string
+	}
 	tests := []struct {
-		name     string
-		c        *Captcha
-		wantId   string
-		wantB64s string
-		wantErr  bool
+		name string
+		args args
+		want bool
 	}{
 		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotId, gotB64s, err := tt.c.Generate()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Captcha.Generate() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if gotId != tt.wantId {
-				t.Errorf("Captcha.Generate() gotId = %v, want %v", gotId, tt.wantId)
-			}
-			if gotB64s != tt.wantB64s {
-				t.Errorf("Captcha.Generate() gotB64s = %v, want %v", gotB64s, tt.wantB64s)
+			if got := pathExists(tt.args.path); got != tt.want {
+				t.Errorf("pathExists() = %v, want %v", got, tt.want)
 			}
 		})
 	}

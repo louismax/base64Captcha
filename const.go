@@ -1,10 +1,5 @@
 package base64Captcha
 
-const idLen = 20
-
-// idChars are characters allowed in captcha id.
-var idChars = []byte(TxtNumbers + TxtAlphabet)
-
 const (
 	imageStringDpi = 72.0
 	//TxtNumbers chacters for numbers.
@@ -40,21 +35,54 @@ const (
 		"眼王按格养易置派层片始却专状育厂京识适属" +
 		"圆包火住调满县局照参红细引听该铁价严龙飞"
 
-	//MimeTypeAudio output base64 mine-type.
-	MimeTypeAudio = "audio/wav"
-	//MimeTypeImage output base64 mine-type.
-	MimeTypeImage = "image/png"
-	//Emoji is a source string for randTxt
-	Emoji = "😀😃💯😄🤖😻😅🤣😂🧑🙃😉😊😇😍👴🤩😘😗☺👽♀😙♂😋😛🎨😜🤪😝🤑🤗🤭🤫🤔🤐🤨😐🙉😶😏💗🙄😬🤥😌😪🤤😷🤢🤮🤯😵🤠😎🧐😨😰😱😭😖😡🤬👿☠💀💥💢"
+	//MimeTypeCaptchaAudio output base64 mine-type.
+	MimeTypeCaptchaAudio = "audio/wav"
+	//MimeTypeCaptchaImage output base64 mine-type.
+	MimeTypeCaptchaImage = "image/png"
+
+	//FileExtCaptchaAudio output file extension.
+	FileExtCaptchaAudio = "wav"
+	//FileExtCaptchaImage output file extension.
+	FileExtCaptchaImage = "png"
+)
+const (
+	//CaptchaComplexLower complex level lower.
+	CaptchaComplexLower = iota
+	//CaptchaComplexMedium complex level medium.
+	CaptchaComplexMedium
+	//CaptchaComplexHigh complex level high.
+	CaptchaComplexHigh
+)
+const (
+	//CaptchaModeNumber mode number.
+	CaptchaModeNumber = iota
+	//CaptchaModeAlphabet mode alphabet.
+	CaptchaModeAlphabet
+	//CaptchaModeArithmetic mode arithmetic.
+	CaptchaModeArithmetic
+	//CaptchaModeNumberAlphabet mode mix number and alphabet,this is also default mode.
+	CaptchaModeNumberAlphabet
+	//CaptchaModeChinese made chinese captcha .
+	CaptchaModeChinese
+	//CaptchaModeUseSequencedCharacters uses Sequenced Characters.
+	CaptchaModeUseSequencedCharacters
 )
 
-//var cjkFontFamilies = readCJKFonts()
+//GoTestOutputDir run go test command where the png and wav file output
 
 const (
-	//OptionShowHollowLine shows hollow line
-	OptionShowHollowLine = 2
-	//OptionShowSlimeLine shows slime line
-	OptionShowSlimeLine = 4
-	//OptionShowSineLine shows sine line
-	OptionShowSineLine = 8
+	// DefaultLen Default number of digits in captcha solution.
+	// 默认数字验证长度.
+	DefaultLen = 6
+	// MaxSkew max absolute skew factor of a single digit.
+	// 图像验证码的最大干扰洗漱.
+	MaxSkew = 0.7
+	// DotCount Number of background circles.
+	// 图像验证码干扰圆点的数量.
+	DotCount = 20
+)
+const (
+	digitFontWidth     = 11
+	digitFontHeight    = 18
+	digitFontBlackChar = 1
 )

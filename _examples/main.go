@@ -11,50 +11,49 @@ import (
 
 //configJsonBody json request body.
 type configJsonBody struct {
-	Id            string
-	CaptchaType   string
-	VerifyValue   string
-	DriverAudio   *base64Captcha.DriverAudio
-	DriverString  *base64Captcha.DriverString
-	DriverChinese *base64Captcha.DriverChinese
-	DriverMath    *base64Captcha.DriverMath
-	DriverDigit   *base64Captcha.DriverDigit
+	Id              string
+	CaptchaType     string
+	VerifyValue     string
+	ConfigAudio     base64Captcha.ConfigAudio
+	ConfigCharacter base64Captcha.ConfigCharacter
+	ConfigDigit     base64Captcha.ConfigDigit
 }
-
-var store = base64Captcha.DefaultMemStore
 
 // base64Captcha create http handler
 func generateCaptchaHandler(w http.ResponseWriter, r *http.Request) {
 	//parse request parameters
+	//接收客户端发送来的请求参数
 	decoder := json.NewDecoder(r.Body)
-	var param configJsonBody
-	err := decoder.Decode(&param)
+	var postParameters configJsonBody
+	err := decoder.Decode(&postParameters)
 	if err != nil {
 		log.Println(err)
 	}
 	defer r.Body.Close()
-	var driver base64Captcha.Driver
 
-	//choose driver
-	switch param.CaptchaType {
+	//create base64 encoding captcha
+	//创建base64图像验证码
+
+	var config interface{}
+	switch postParameters.CaptchaType {
 	case "audio":
-		driver = param.DriverAudio
-	case "string":
-		driver = param.DriverString.ConvertFonts()
-	case "math":
-		driver = param.DriverMath.ConvertFonts()
-	case "chinese":
-		driver = param.DriverChinese.ConvertFonts()
+		config = postParameters.ConfigAudio
+	case "character":
+		config = postParameters.ConfigCharacter
 	default:
-		driver = param.DriverDigit
+		config = postParameters.ConfigDigit
 	}
-	c := base64Captcha.NewCaptcha(driver, store)
-	id, b64s, err := c.Generate()
-	body := map[string]interface{}{"code": 1, "data": b64s, "captchaId": id, "msg": "success"}
-	if err != nil {
-		body = map[string]interface{}{"code": 0, "msg": err.Error()}
-	}
+	captchaId, captcaInterfaceInstance := base64Captcha.GenerateCaptcha(postParameters.Id, config)
+	base64blob := base64Captcha.CaptchaWriteToBase64Encoding(captcaInterfaceInstance)
+
+	//or you can just write the captcha content to the httpResponseWriter.
+	//before you put the captchaId into the response COOKIE.
+	//captcaInterfaceInstance.WriteTo(w)
+
+	//set json response
+	//设置json响应
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	body := map[string]interface{}{"code": 1, "data": base64blob, "captchaId": captchaId, "msg": "success"}
 	json.NewEncoder(w).Encode(body)
 }
 
@@ -62,26 +61,30 @@ func generateCaptchaHandler(w http.ResponseWriter, r *http.Request) {
 func captchaVerifyHandle(w http.ResponseWriter, r *http.Request) {
 
 	//parse request parameters
+	//接收客户端发送来的请求参数
 	decoder := json.NewDecoder(r.Body)
-	var param configJsonBody
-	err := decoder.Decode(&param)
+	var postParameters configJsonBody
+	err := decoder.Decode(&postParameters)
 	if err != nil {
 		log.Println(err)
 	}
 	defer r.Body.Close()
 	//verify the captcha
-	body := map[string]interface{}{"code": 0, "msg": "failed"}
-	if store.Verify(param.Id, param.VerifyValue, true) {
-		body = map[string]interface{}{"code": 1, "msg": "ok"}
-	}
+	//比较图像验证码
+	verifyResult := base64Captcha.VerifyCaptcha(postParameters.Id, postParameters.VerifyValue)
 
 	//set json response
+	//设置json响应
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-
+	body := map[string]interface{}{"code": "error", "data": "验证失败", "msg": "captcha failed"}
+	if verifyResult {
+		body = map[string]interface{}{"code": "success", "data": "验证通过", "msg": "captcha verified"}
+	}
 	json.NewEncoder(w).Encode(body)
 }
 
 //start a net/http server
+//启动golang net/http 服务器
 func main() {
 	//serve Vuejs+ElementUI+Axios Web Application
 	http.Handle("/", http.FileServer(http.Dir("./static")))
